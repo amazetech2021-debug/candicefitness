@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>轻塑日记</title>
+<meta name="description" content="体重记录、训练打卡与跟练视频的个人健身追踪工具">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Roboto+Mono:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#F4F5F3; --surface:#FFFFFF; --surface-2:#EBEEE9; --ink:#1A1D1B; --muted:#6E756F;
+  --line:#DCE1DA; --accent:#FF5A36; --accent-ink:#FFFFFF; --good:#1F8A5F; --warn:#C9840A;
+  --radius:14px; --radius-sm:8px; color-scheme:light;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141613; --surface:#1D211C; --surface-2:#262B24; --ink:#EEF0EB; --muted:#9AA39A;
+    --line:#333B31; --accent:#FF7A52; --accent-ink:#141613; --good:#4CC492; --warn:#E9B24A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141613; --surface:#1D211C; --surface-2:#262B24; --ink:#EEF0EB; --muted:#9AA39A;
+  --line:#333B31; --accent:#FF7A52; --accent-ink:#141613; --good:#4CC492; --warn:#E9B24A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{background:var(--bg);color:var(--ink);font-family:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;}
+button,input,select,textarea{font-family:inherit;}
+[hidden]{display:none!important;}
+img{max-width:100%;}
+#app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 40px;}
+.mono{font-family:'Roboto Mono',ui-monospace,SFMono-Regular,monospace;font-variant-numeric:tabular-nums;}
+main{display:block;}
+
+.appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{font-weight:900;font-size:1.2rem;letter-spacing:-.02em;}
+.brand small{display:block;font-weight:500;font-size:.68rem;color:var(--muted);letter-spacing:.03em;margin-top:1px;}
+.weight-pill{display:flex;align-items:baseline;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;}
+.weight-pill .num{font-weight:700;font-size:1.05rem;}
+.weight-pill .unit{font-size:.7rem;color:var(--muted);}
+
+.tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 50px);z-index:4;background:var(--bg);display:flex;gap:6px;padding-block:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);}
+.tab-btn{flex:none;font-weight:700;font-size:.85rem;color:var(--muted);background:none;border:none;padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;}
+.tab-btn[aria-selected="true"]{background:var(--ink);color:var(--bg);}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-block:12px;}
+.card h2{margin:0 0 4px;font-size:1rem;font-weight:900;}
+.card .sub{color:var(--muted);font-size:.8rem;margin:0 0 12px;}
+.cap{font-size:.72rem;opacity:.75;}
+
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.section-head h2{margin:0;}
+.link-btn{background:none;border:none;color:var(--accent);font-weight:700;font-size:.8rem;cursor:pointer;padding:0;white-space:nowrap;}
+
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.stat-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;}
+.stat-tile .label{font-size:.72rem;color:var(--muted);font-weight:600;}
+.stat-tile .value{font-family:'Roboto Mono',monospace;font-weight:700;font-size:1.4rem;margin-top:3px;font-variant-numeric:tabular-nums;}
+.stat-tile .value small{font-family:'Noto Sans SC';font-size:.68rem;font-weight:500;color:var(--muted);margin-left:2px;}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted);padding:6px 10px;}
+.btn:active{transform:scale(.98);}
+
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.field label{font-size:.76rem;font-weight:700;color:var(--muted);}
+.field input,.field select,.field textarea{padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--bg);color:var(--ink);font-size:.9rem;}
+.field textarea{resize:vertical;min-height:46px;}
+.form-row{display:flex;gap:10px;}
+.form-row .field{flex:1;min-width:0;}
+.select-inline{padding:9px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:.82rem;}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{font-size:.8rem;font-weight:700;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+.chip.filter[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.entry-list{display:flex;flex-direction:column;}
+.entry{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
+.entry:last-child{border-bottom:none;}
+.entry .date{font-family:'Roboto Mono',monospace;font-size:.76rem;color:var(--muted);width:48px;flex:none;}
+.entry .main{flex:1;min-width:0;}
+.entry .main .title{font-weight:700;font-size:.9rem;}
+.entry .main .meta{font-size:.75rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;font-weight:600;padding:4px 6px;flex:none;}
+
+.empty{text-align:center;padding:28px 12px;color:var(--muted);font-size:.85rem;}
+
+.chart-wrap{width:100%;overflow:hidden;}
+svg.chart{width:100%;height:auto;display:block;}
+.chart text{font-family:'Roboto Mono',monospace;font-size:8px;fill:var(--muted);}
+.chart .target-label{font-family:'Noto Sans SC';font-weight:700;fill:var(--ink);}
+
+.heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.heatmap .dow{font-size:.68rem;text-align:center;color:var(--muted);font-weight:700;}
+.heat-cell{aspect-ratio:1;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);}
+.heat-cell.done{background:var(--good);border-color:var(--good);}
+.heat-cell.today{outline:2px solid var(--accent);outline-offset:1px;}
+.heat-cell.pad{background:none;border:none;}
+
+.goal-banner{background:var(--ink);color:var(--bg);border-radius:var(--radius);padding:18px;margin-block:12px;}
+.goal-banner .row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;}
+.goal-banner .big{font-family:'Roboto Mono',monospace;font-weight:700;font-size:2rem;font-variant-numeric:tabular-nums;}
+.progress-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.15);margin-top:14px;overflow:hidden;}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:inherit;}
+
+.video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+.video-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;}
+.video-card video{width:100%;aspect-ratio:16/9;background:#000;display:block;}
+.thumb-link{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;background:var(--surface-2);color:var(--muted);font-size:.8rem;font-weight:700;text-decoration:none;}
+.video-card .info{padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.video-card .title{font-weight:700;font-size:.84rem;line-height:1.3;}
+.video-card .cat{font-size:.72rem;color:var(--muted);}
+
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:.84rem;font-weight:600;z-index:20;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;max-width:80vw;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+(function(){
+"use strict";
+
+var STORAGE_KEY='qingsu-diary-state-v1';
+var DB_NAME='qingsuDiaryDB', DB_VERSION=1, STORE_NAME='videoBlobs';
+
+var TRAINING_TYPES=['力量','核心塑形','HIIT','拉伸放松','有氧','瑜伽'];
+var VIDEO_CATEGORIES=['全身塑形','核心','上肢','下肢','拉伸放松','有氧'];
+var GOAL_FOCUS=['塑形减脂','维持塑形','增肌塑形'];
+var TABS=[['today','今日'],['weight','体重'],['training','训练'],['videos','跟练视频']];
+
+var STATE=null;
+var currentTab='today';
+var confirming=null;
+var showGoalForm=false;
+var showLinkForm=false;
+var videoFilter='all';
+var videoUrlCache={};
+
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function pad2(n){ return n<10?'0'+n:''+n; }
+function fmtDate(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function todayStr(){ return fmtDate(new Date()); }
+function parseDate(s){ var p=s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
+function shortDate(s){ var d=parseDate(s); return (d.getMonth()+1)+'/'+d.getDate(); }
+function round1(x){ return Math.round(x*10)/10; }
+
+/* ---------- IndexedDB for video blobs (local to this browser) ---------- */
+function openDB(){
+  return new Promise(function(resolve,reject){
+    if(!window.indexedDB){ reject(new Error('no-idb')); return; }
+    var req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=function(e){
+      var db=e.target.result;
+      if(!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess=function(e){ resolve(e.target.result); };
+    req.onerror=function(e){ reject(e.target.error); };
+  });
+}
+function idbPut(id,blob){
+  return openDB().then(function(db){
+    return new Promise(function(resolve,reject){
+      var tx=db.transaction(STORE_NAME,'readwrite');
+      tx.objectStore(STORE_NAME).put(blob,id);
+      tx.oncomplete=function(){ resolve(); };
+      tx.onerror=function(){ reject(tx.error); };
+    });
+  });
+}
+function idbGet(id){
+  return openDB().then(function(db){
+    return new Promise(function(resolve,reject){
+      var tx=db.transaction(STORE_NAME,'readonly');
+      var req=tx.objectStore(STORE_NAME).get(id);
+      req.onsuccess=function(){ resolve(req.result); };
+      req.onerror=function(){ reject(req.error); };
+    });
+  });
+}
+function idbDelete(id){
+  return openDB().then(function(db){
+    return new Promise(function(resolve,reject){
+      var tx=db.transaction(STORE_NAME,'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+      tx.oncomplete=function(){ resolve(); };
+      tx.onerror=function(){ reject(tx.error); };
+    });
+  });
+}
+function hydrateVideos(){
+  document.querySelectorAll('video[data-blob-id]').forEach(function(v){
+    var id=v.getAttribute('data-blob-id');
+    if(videoUrlCache[id]){ v.src=videoUrlCache[id]; return; }
+    idbGet(id).then(function(blob){
+      if(!blob) return;
+      var url=URL.createObjectURL(blob);
+      videoUrlCache[id]=url;
+      v.src=url;
+    }).catch(function(){});
+  });
+}
+
+/* ---------- state helpers ---------- */
+function latestWeight(state){
+  if(!state.weights.length) return null;
+  return state.weights.slice().sort(function(a,b){return a.date<b.date?-1:1;}).slice(-1)[0];
+}
+function computeStreak(checkins){
+  var set={}; checkins.forEach(function(c){set[c.date]=true;});
+  var d=new Date(); d.setHours(0,0,0,0);
+  if(!set[fmtDate(d)]) d.setDate(d.getDate()-1);
+  var streak=0;
+  while(set[fmtDate(d)]){ streak++; d.setDate(d.getDate()-1); }
+  return streak;
+}
+function computeWeekCount(checkins){
+  var d=new Date(); d.setHours(0,0,0,0);
+  var dow=(d.getDay()+6)%7;
+  var monday=new Date(d); monday.setDate(d.getDate()-dow);
+  var count=0;
+  checkins.forEach(function(c){ var cd=parseDate(c.date); if(cd>=monday && cd<=d) count++; });
+  return count;
+}
+function upsertCheckin(s,date,type,duration,note){
+  var idx=s.checkins.findIndex(function(c){return c.date===date;});
+  var entry={id: idx>=0?s.checkins[idx].id:uid(), date:date, type:type, duration:duration, note:note};
+  if(idx>=0) s.checkins[idx]=entry; else s.checkins.push(entry);
+}
+
+function statTile(label,value,unit){
+  return '<div class="stat-tile"><div class="label">'+esc(label)+'</div><div class="value">'+esc(value)+(unit?' <small>'+esc(unit)+'</small>':'')+'</div></div>';
+}
+function delControl(key){
+  if(confirming===key){
+    return '<div style="display:flex;gap:6px;flex:none;"><button type="button" class="btn ghost" style="color:var(--warn);" data-action="confirm-del" data-key="'+key+'">确认删除</button><button type="button" class="btn ghost" data-action="cancel-del">取消</button></div>';
+  }
+  return '<button type="button" class="del" data-action="ask-del" data-key="'+key+'">删除</button>';
+}
+
+/* ---------- chart & heatmap ---------- */
+function chartSVG(state){
+  var entries=state.weights.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+  if(entries.length<2) return '<div class="empty">记录满 2 次体重后，这里会显示趋势图表</div>';
+  var recent=entries.slice(-60);
+  var W=320,H=150,padL=28,padR=14,padT=16,padB=22;
+  var target=state.goal?state.goal.targetWeight:null;
+  var ws=recent.map(function(e){return e.weight;}).concat(target?[target]:[]);
+  var minW=Math.min.apply(null,ws), maxW=Math.max.apply(null,ws);
+  if(minW===maxW){ minW-=1; maxW+=1; }
+  var pd=(maxW-minW)*0.18; minW-=pd; maxW+=pd;
+  function x(i){ return padL + (recent.length===1?0:(i/(recent.length-1)))*(W-padL-padR); }
+  function y(w){ return padT + (1-(w-minW)/(maxW-minW))*(H-padT-padB); }
+  var linePts=recent.map(function(e,i){return x(i)+','+y(e.weight);}).join(' ');
+  var areaPts='M'+x(0)+','+(H-padB)+' L'+recent.map(function(e,i){return x(i)+','+y(e.weight);}).join(' L')+' L'+x(recent.length-1)+','+(H-padB)+' Z';
+  var circles=recent.map(function(e,i){
+    var last=i===recent.length-1;
+    return '<circle cx="'+x(i)+'" cy="'+y(e.weight)+'" r="'+(last?4:2.5)+'" style="fill:'+(last?'var(--accent)':'var(--surface)')+';stroke:var(--accent);stroke-width:'+(last?0:1.4)+'"/>';
+  }).join('');
+  var targetLine='';
+  if(target){
+    var ty=y(target);
+    targetLine='<line x1="'+padL+'" y1="'+ty+'" x2="'+(W-padR)+'" y2="'+ty+'" style="stroke:var(--muted);stroke-width:1;stroke-dasharray:3,3"/>'
+      +'<text x="'+(W-padR)+'" y="'+(ty-4)+'" text-anchor="end" class="target-label">目标 '+target+'</text>';
+  }
+  var last=recent[recent.length-1];
+  var lastLabel='<text x="'+x(recent.length-1)+'" y="'+(y(last.weight)-10)+'" text-anchor="end" class="target-label">'+last.weight+'</text>';
+  var firstDateLabel='<text x="'+padL+'" y="'+(H-4)+'" text-anchor="start">'+shortDate(recent[0].date)+'</text>';
+  var lastDateLabel='<text x="'+(W-padR)+'" y="'+(H-4)+'" text-anchor="end">'+shortDate(last.date)+'</text>';
+  return '<div class="chart-wrap"><svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'
+    +'<defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">'
+      +'<stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.28"/>'
+      +'<stop offset="100%" style="stop-color:var(--accent);stop-opacity:0"/>'
+    +'</linearGradient></defs>'
+    +'<path d="'+areaPts+'" style="fill:url(#areaFill);stroke:none"/>'
+    +'<polyline points="'+linePts+'" style="fill:none;stroke:var(--accent);stroke-width:2"/>'
+    +targetLine+circles+lastLabel+firstDateLabel+lastDateLabel
+    +'</svg></div>';
+}
+function heatmapGrid(state,weeks){
+  weeks=weeks||6;
+  var set={}; state.checkins.forEach(function(c){set[c.date]=true;});
+  var today=new Date(); today.setHours(0,0,0,0);
+  var totalDays=weeks*7;
+  var days=[];
+  for(var i=totalDays-1;i>=0;i--){ var d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
+  var firstDow=(days[0].getDay()+6)%7;
+  var cells=[];
+  for(var p=0;p<firstDow;p++) cells.push(null);
+  days.forEach(function(d){ cells.push(d); });
+  var dowLabels=['一','二','三','四','五','六','日'];
+  var head=dowLabels.map(function(l){return '<div class="dow">'+l+'</div>';}).join('');
+  var body=cells.map(function(d){
+    if(!d) return '<div class="heat-cell pad"></div>';
+    var ds=fmtDate(d);
+    var isToday=ds===fmtDate(today);
+    var done=!!set[ds];
+    return '<div class="heat-cell'+(done?' done':'')+(isToday?' today':'')+'" title="'+ds+(done?' 已打卡':'')+'"></div>';
+  }).join('');
+  return '<div class="heatmap">'+head+body+'</div>';
+}
+
+function goalSetupCard(goal){
+  var isEdit=!!goal;
+  return '<div class="card"><h2>'+(isEdit?'编辑塑形目标':'设置你的塑形目标')+'</h2>'
+    +'<p class="sub">记录起始体重和目标体重，开始塑形减重打卡</p>'
+    +'<form data-form="goal-setup">'
+    +'<div class="form-row"><div class="field"><label>起始体重 (kg)</label><input type="number" step="0.1" min="20" max="400" name="startWeight" required value="'+(goal?goal.startWeight:'')+'"></div>'
+    +'<div class="field"><label>目标体重 (kg)</label><input type="number" step="0.1" min="20" max="400" name="targetWeight" required value="'+(goal?goal.targetWeight:'')+'"></div></div>'
+    +'<div class="form-row"><div class="field"><label>塑形重点</label><select name="focus">'
+      +GOAL_FOCUS.map(function(f){return '<option value="'+f+'"'+(goal&&goal.focus===f?' selected':'')+'>'+f+'</option>';}).join('')
+      +'</select></div>'
+    +'<div class="field"><label>目标日期（可选）</label><input type="date" name="targetDate" value="'+(goal&&goal.targetDate?goal.targetDate:'')+'"></div></div>'
+    +'<div style="display:flex;gap:10px;margin-top:4px;"><button type="submit" class="btn primary">保存目标</button>'
+    +(isEdit?'<button type="button" class="btn ghost" data-action="toggle-goal-edit">取消</button>':'')
+    +'</div></form></div>';
+}
+
+function renderHeader(state){
+  var lw=latestWeight(state);
+  return '<header class="appbar"><div class="brand">轻塑日记<small>塑形 · 减重 · 打卡</small></div>'
+    +'<div class="weight-pill"><span class="num mono">'+(lw?lw.weight:'--')+'</span><span class="unit">kg</span></div></header>';
+}
+function renderTabs(){
+  return '<nav class="tabs" role="tablist">'+TABS.map(function(t){
+    return '<button type="button" class="tab-btn" role="tab" data-tab="'+t[0]+'" aria-selected="'+(currentTab===t[0]?'true':'false')+'">'+t[1]+'</button>';
+  }).join('')+'</nav>';
+}
+
+function renderToday(state){
+  if(!state.goal) return goalSetupCard(null);
+  var lw=latestWeight(state);
+  var current=lw?lw.weight:state.goal.startWeight;
+  var start=state.goal.startWeight, target=state.goal.targetWeight;
+  var total=start-target;
+  var progressed=start-current;
+  var pct=total!==0?Math.max(0,Math.min(100,(progressed/total)*100)):0;
+  var remaining=round1(current-target);
+  var streak=computeStreak(state.checkins);
+  var weekCount=computeWeekCount(state.checkins);
+  var deltaStart=round1(current-start);
+  var html='';
+  html+='<div class="goal-banner"><div class="row">'
+    +'<div><div class="cap">当前体重</div><div class="big mono">'+current+'<span style="font-size:.85rem;opacity:.7;margin-left:4px;">kg</span></div></div>'
+    +'<div style="text-align:right"><div class="cap">目标 '+target+' kg</div><div class="mono" style="font-weight:700;">'+(remaining>0?'还差 '+remaining+' kg':'已达成目标')+'</div></div>'
+    +'</div>'
+    +'<div class="progress-bar"><div class="fill" style="width:'+pct.toFixed(0)+'%"></div></div>'
+    +'<div class="cap" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">已完成 '+pct.toFixed(0)+'%<button type="button" class="link-btn" style="color:var(--bg);text-decoration:underline;opacity:.85;" data-action="toggle-goal-edit">编辑目标</button></div>'
+    +'</div>';
+  if(showGoalForm) html+=goalSetupCard(state.goal);
+  html+='<div class="stat-grid">'
+    +statTile('连续打卡',streak,'天')
+    +statTile('本周训练',weekCount,'次')
+    +statTile('较起始',(deltaStart>=0?'+':'')+deltaStart,'kg')
+    +statTile('塑形重点',state.goal.focus,'')
+    +'</div>';
+  var todayEntry=state.checkins.find(function(c){return c.date===todayStr();});
+  html+='<div class="card"><div class="section-head"><h2>今日打卡</h2>'
+    +(todayEntry?'<span class="cap" style="color:var(--good);font-weight:700;opacity:1;">已打卡：'+esc(todayEntry.type)+'</span>':'')
+    +'</div><p class="sub">点一下记录今天的训练类型，详情可在"训练"页补充时长与备注</p>'
+    +'<div class="chip-row">'+TRAINING_TYPES.map(function(t){
+      return '<button type="button" class="chip" data-quick-checkin="'+t+'" aria-pressed="'+(todayEntry&&todayEntry.type===t?'true':'false')+'">'+t+'</button>';
+    }).join('')+'</div></div>';
+  html+='<div class="card"><div class="section-head"><h2>近两周训练</h2><button type="button" class="link-btn" data-tab="training">查看全部</button></div>'+heatmapGrid(state,2)+'</div>';
+  html+='<div class="card"><div class="section-head"><h2>体重趋势</h2><button type="button" class="link-btn" data-tab="weight">查看全部</button></div>'+chartSVG(state)+'</div>';
+  return html;
+}
+
+function renderWeightTab(state){
+  var entries=state.weights.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+  var html='<div class="card"><h2>体重趋势</h2>'+chartSVG(state)+'</div>';
+  html+='<div class="card"><h2>添加体重记录</h2><form data-form="weight-add">'
+    +'<div class="form-row"><div class="field"><label>日期</label><input type="date" name="date" value="'+todayStr()+'" required></div>'
+    +'<div class="field"><label>体重 (kg)</label><input type="number" step="0.1" min="20" max="400" name="weight" required placeholder="如 58.4"></div></div>'
+    +'<div class="form-row"><div class="field"><label>体脂率 %（可选）</label><input type="number" step="0.1" min="1" max="70" name="bodyfat" placeholder="如 24.5"></div>'
+    +'<div class="field"><label>备注（可选）</label><input type="text" name="note" placeholder="如：早起空腹"></div></div>'
+    +'<button type="submit" class="btn primary">保存</button></form></div>';
+  html+='<div class="card"><h2>历史记录</h2>';
+  if(!entries.length){ html+='<div class="empty">还没有体重记录，添加第一条吧</div>'; }
+  else{
+    html+='<div class="entry-list">'+entries.slice().reverse().map(function(e){
+      var key='weight:'+e.id;
+      return '<div class="entry"><div class="date mono">'+shortDate(e.date)+'</div><div class="main"><div class="title">'+e.weight+' kg'+(e.bodyFat?' · 体脂 '+e.bodyFat+'%':'')+'</div>'+(e.note?'<div class="meta">'+esc(e.note)+'</div>':'')+'</div>'+delControl(key)+'</div>';
+    }).join('')+'</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function renderTrainingTab(state){
+  var streak=computeStreak(state.checkins), weekCount=computeWeekCount(state.checkins);
+  var entries=state.checkins.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+  var html='<div class="stat-grid">'+statTile('连续打卡',streak,'天')+statTile('本周训练',weekCount,'次')+'</div>';
+  html+='<div class="card"><h2>训练日历</h2>'+heatmapGrid(state,6)+'</div>';
+  html+='<div class="card"><h2>记录训练</h2><form data-form="checkin-add" data-chip-group="select-checkin-type">'
+    +'<input type="hidden" name="type" value="">'
+    +'<div class="field"><label>训练类型</label><div class="chip-row">'+TRAINING_TYPES.map(function(t){return '<button type="button" class="chip" data-chip data-value="'+t+'" aria-pressed="false">'+t+'</button>';}).join('')+'</div></div>'
+    +'<div class="form-row"><div class="field"><label>日期</label><input type="date" name="date" value="'+todayStr()+'" required></div>'
+    +'<div class="field"><label>时长（分钟，可选）</label><input type="number" min="1" max="600" name="duration" placeholder="如 45"></div></div>'
+    +'<div class="field"><label>备注（可选）</label><input type="text" name="note" placeholder="如：核心+臀腿"></div>'
+    +'<button type="submit" class="btn primary">保存打卡</button></form></div>';
+  html+='<div class="card"><h2>训练记录</h2>';
+  if(!entries.length){ html+='<div class="empty">还没有训练记录，今天开始第一次打卡吧</div>'; }
+  else{
+    html+='<div class="entry-list">'+entries.slice().reverse().map(function(c){
+      var key='checkin:'+c.id;
+      return '<div class="entry"><div class="date mono">'+shortDate(c.date)+'</div><div class="main"><div class="title">'+esc(c.type)+(c.duration?' · '+c.duration+' 分钟':'')+'</div>'+(c.note?'<div class="meta">'+esc(c.note)+'</div>':'')+'</div>'+delControl(key)+'</div>';
+    }).join('')+'</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function renderVideosTab(state){
+  var cats=['全部'].concat(VIDEO_CATEGORIES);
+  var filterChips='<div class="chip-row" data-chip-group="filter-video">'+cats.map(function(c){
+    var val=c==='全部'?'all':c;
+    return '<button type="button" class="chip filter" data-chip data-value="'+val+'" aria-pressed="'+(videoFilter===val?'true':'false')+'">'+c+'</button>';
+  }).join('')+'</div>';
+  var toolbar='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
+    +'<label class="btn primary" for="video-file-input" style="cursor:pointer;">上传视频</label>'
+    +'<input type="file" id="video-file-input" accept="video/*" data-video-upload hidden>'
+    +'<select id="upload-category-select" class="select-inline">'+VIDEO_CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('')+'</select>'
+    +'<button type="button" class="btn ghost" data-action="toggle-link-form">'+(showLinkForm?'取消添加链接':'+ 添加链接')+'</button>'
+    +'</div><p class="cap" style="margin-top:8px;">上传的视频保存在你当前使用的这台设备/浏览器里（换设备或清除浏览器数据后需要重新上传），建议单个文件不超过 300MB。较长的教程建议用"添加链接"关联网盘或视频网站地址。</p>';
+  var linkForm=showLinkForm?('<form data-form="video-link" data-chip-group="select-video-category" style="margin-top:12px;">'
+    +'<input type="hidden" name="category" value="'+VIDEO_CATEGORIES[0]+'">'
+    +'<div class="field"><label>视频标题</label><input type="text" name="title" required placeholder="如：20分钟核心塑形"></div>'
+    +'<div class="field"><label>视频链接</label><input type="url" name="url" required placeholder="https://..."></div>'
+    +'<div class="field"><label>分类</label><div class="chip-row">'+VIDEO_CATEGORIES.map(function(c,i){return '<button type="button" class="chip" data-chip data-value="'+c+'" aria-pressed="'+(i===0?'true':'false')+'">'+c+'</button>';}).join('')+'</div></div>'
+    +'<button type="submit" class="btn primary" style="margin-top:4px;">保存链接</button></form>'):'';
+  var list=state.videos.filter(function(v){ return videoFilter==='all'||v.category===videoFilter; });
+  var grid;
+  if(!list.length){
+    grid='<div class="empty">'+(state.videos.length?'该分类下暂无视频':'还没有跟练视频，上传或添加一个链接开始吧')+'</div>';
+  } else {
+    grid='<div class="video-grid">'+list.slice().reverse().map(function(v){
+      var key='video:'+v.id;
+      var media=v.external
+        ? '<a class="thumb-link" href="'+esc(v.url)+'" target="_blank" rel="noopener">打开视频 →</a>'
+        : '<video data-blob-id="'+v.id+'" controls preload="metadata"></video>';
+      return '<div class="video-card">'+media+'<div class="info"><div class="title">'+esc(v.title)+'</div><div class="cat">'+esc(v.category)+'</div>'+delControl(key)+'</div></div>';
+    }).join('')+'</div>';
+  }
+  return '<div class="card"><h2>跟练视频库</h2><p class="sub">上传训练视频或添加外部链接，随时跟练</p>'+filterChips+toolbar+linkForm+'</div><div style="margin-top:4px;">'+grid+'</div>';
+}
+
+function renderApp(state){
+  var body;
+  if(currentTab==='today') body=renderToday(state);
+  else if(currentTab==='weight') body=renderWeightTab(state);
+  else if(currentTab==='training') body=renderTrainingTab(state);
+  else body=renderVideosTab(state);
+  return renderHeader(state)+renderTabs()+'<main>'+body+'</main>';
+}
+
+function render(){
+  var el=document.getElementById('app');
+  if(el) el.innerHTML=renderApp(STATE);
+  hydrateVideos();
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(function(){ t.classList.remove('show'); },2400);
+}
+
+function saveState(state){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ showToast('本地存储空间不足，部分内容可能无法保存'); }
+}
+function mutate(fn){
+  var newState=JSON.parse(JSON.stringify(STATE));
+  fn(newState);
+  STATE=newState;
+  render();
+  saveState(newState);
+}
+
+function deleteWeight(id){ mutate(function(s){ s.weights=s.weights.filter(function(w){return w.id!==id;}); }); showToast('已删除'); }
+function deleteCheckin(id){ mutate(function(s){ s.checkins=s.checkins.filter(function(c){return c.id!==id;}); }); showToast('已删除'); }
+function deleteVideo(id){
+  var v=STATE.videos.find(function(x){return x.id===id;});
+  mutate(function(s){ s.videos=s.videos.filter(function(x){return x.id!==id;}); });
+  showToast('已删除');
+  if(v&&!v.external){
+    idbDelete(id).catch(function(){});
+    if(videoUrlCache[id]){ URL.revokeObjectURL(videoUrlCache[id]); delete videoUrlCache[id]; }
+  }
+}
+
+function handleGoalSetup(form){
+  var startWeight=parseFloat(form.startWeight.value);
+  var targetWeight=parseFloat(form.targetWeight.value);
+  var focus=form.focus.value;
+  var targetDate=form.targetDate.value||null;
+  if(!startWeight||!targetWeight||startWeight<=0||targetWeight<=0){ showToast('请输入有效的体重数值'); return; }
+  var wasEdit=!!STATE.goal;
+  mutate(function(s){
+    s.goal={startWeight:startWeight,targetWeight:targetWeight,focus:focus,targetDate:targetDate,startDate:(s.goal&&s.goal.startDate)||todayStr()};
+    if(!wasEdit&&s.weights.length===0){ s.weights.push({id:uid(),date:todayStr(),weight:startWeight,bodyFat:null,note:'初始体重'}); }
+  });
+  showGoalForm=false;
+  showToast('目标已保存');
+}
+function handleWeightAdd(form){
+  var weight=parseFloat(form.weight.value);
+  var date=form.date.value||todayStr();
+  if(!weight||weight<=0||weight>400){ showToast('请输入有效体重'); return; }
+  var bodyFat=form.bodyfat.value?parseFloat(form.bodyfat.value):null;
+  var note=form.note.value.trim();
+  mutate(function(s){
+    var idx=s.weights.findIndex(function(w){return w.date===date;});
+    var entry={id:idx>=0?s.weights[idx].id:uid(),date:date,weight:weight,bodyFat:bodyFat,note:note};
+    if(idx>=0) s.weights[idx]=entry; else s.weights.push(entry);
+  });
+  showToast('体重记录已保存');
+}
+function handleCheckinAdd(form){
+  var type=form.type.value;
+  if(!type){ showToast('请选择训练类型'); return; }
+  var date=form.date.value||todayStr();
+  var duration=form.duration.value?parseInt(form.duration.value,10):null;
+  var note=form.note.value.trim();
+  mutate(function(s){ upsertCheckin(s,date,type,duration,note); });
+  showToast('训练记录已保存');
+}
+function handleVideoLink(form){
+  var title=form.title.value.trim();
+  var url=form.url.value.trim();
+  var category=form.category.value||VIDEO_CATEGORIES[0];
+  if(!title||!url){ showToast('请填写标题和链接'); return; }
+  if(!/^https?:\/\//i.test(url)){ showToast('链接需以 http:// 或 https:// 开头'); return; }
+  mutate(function(s){ s.videos.push({id:uid(),title:title,url:url,category:category,external:true,addedDate:todayStr()}); });
+  showLinkForm=false;
+  showToast('视频已添加');
+}
+function handleVideoUpload(input){
+  var file=input.files&&input.files[0];
+  if(!file) return;
+  var id=uid();
+  var catSelect=document.getElementById('upload-category-select');
+  var category=catSelect?catSelect.value:VIDEO_CATEGORIES[0];
+  showToast('正在保存视频...');
+  idbPut(id,file).then(function(){
+    var title=file.name.replace(/\.[^.]+$/,'');
+    mutate(function(s){ s.videos.push({id:id,title:title,category:category,external:false,addedDate:todayStr()}); });
+    showToast('视频已保存到本机');
+  }).catch(function(){
+    showToast('保存失败（可能是存储空间不足或浏览器不支持）');
+  });
+  input.value='';
+}
+
+function onChipClick(chip){
+  var group=chip.closest('[data-chip-group]');
+  if(!group) return;
+  var gtype=group.getAttribute('data-chip-group');
+  if(gtype==='filter-video'){
+    videoFilter=chip.dataset.value;
+    render();
+    return;
+  }
+  var hidden=group.querySelector('input[type="hidden"]');
+  if(hidden) hidden.value=chip.dataset.value;
+  group.querySelectorAll('[data-chip]').forEach(function(c){ c.setAttribute('aria-pressed', c===chip?'true':'false'); });
+}
+
+function boot(){
+  var initial={goal:null,weights:[],checkins:[],videos:[]};
+  try{
+    var raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){ var parsed=JSON.parse(raw); if(parsed&&typeof parsed==='object') initial=parsed; }
+  }catch(e){}
+  STATE=initial;
+  render();
+
+  var app=document.getElementById('app');
+  app.addEventListener('click',function(e){
+    var tabEl=e.target.closest('[data-tab]');
+    if(tabEl){ currentTab=tabEl.dataset.tab; confirming=null; render(); window.scrollTo(0,0); return; }
+
+    var chip=e.target.closest('[data-chip]');
+    if(chip){ onChipClick(chip); return; }
+
+    var quick=e.target.closest('[data-quick-checkin]');
+    if(quick){
+      var type=quick.dataset.quickCheckin;
+      mutate(function(s){ upsertCheckin(s,todayStr(),type,null,''); });
+      showToast('已打卡：'+type);
+      return;
+    }
+
+    var tge=e.target.closest('[data-action="toggle-goal-edit"]');
+    if(tge){ showGoalForm=!showGoalForm; render(); return; }
+
+    var tlf=e.target.closest('[data-action="toggle-link-form"]');
+    if(tlf){ showLinkForm=!showLinkForm; render(); return; }
+
+    var ask=e.target.closest('[data-action="ask-del"]');
+    if(ask){ confirming=ask.dataset.key; render(); return; }
+
+    var cancel=e.target.closest('[data-action="cancel-del"]');
+    if(cancel){ confirming=null; render(); return; }
+
+    var confirmBtn=e.target.closest('[data-action="confirm-del"]');
+    if(confirmBtn){
+      var parts=confirmBtn.dataset.key.split(':');
+      var kind=parts[0], id=parts[1];
+      confirming=null;
+      if(kind==='weight') deleteWeight(id);
+      else if(kind==='checkin') deleteCheckin(id);
+      else if(kind==='video') deleteVideo(id);
+      return;
+    }
+  });
+
+  app.addEventListener('submit',function(e){
+    var form=e.target.closest('form[data-form]');
+    if(!form) return;
+    e.preventDefault();
+    var kind=form.getAttribute('data-form');
+    if(kind==='goal-setup') handleGoalSetup(form);
+    else if(kind==='weight-add') handleWeightAdd(form);
+    else if(kind==='checkin-add') handleCheckinAdd(form);
+    else if(kind==='video-link') handleVideoLink(form);
+  });
+
+  app.addEventListener('change',function(e){
+    if(e.target.matches('[data-video-upload]')) handleVideoUpload(e.target);
+  });
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',boot);
+} else {
+  boot();
+}
+})();
+</script>
+</body>
+</html>

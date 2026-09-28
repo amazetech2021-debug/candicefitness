@@ -8,21 +8,21 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Roboto+Mono:wght@500;700&display=swap">
 <style>
 :root{
-  --bg:#F4F5F3; --surface:#FFFFFF; --surface-2:#EBEEE9; --ink:#1A1D1B; --muted:#6E756F;
-  --line:#DCE1DA; --accent:#FF5A36; --accent-ink:#FFFFFF; --good:#1F8A5F; --warn:#C9840A;
-  --radius:14px; --radius-sm:8px; color-scheme:light;
+  --bg:#F6F3F7; --surface:#FFFFFF; --surface-2:#F0E8F2; --ink:#2B1F33; --muted:#83758C;
+  --line:#E5DBE9; --accent:#F0577A; --accent-ink:#FFFFFF; --good:#2E9C8A; --warn:#D99A3C;
+  --radius:16px; --radius-sm:10px; color-scheme:light;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#141613; --surface:#1D211C; --surface-2:#262B24; --ink:#EEF0EB; --muted:#9AA39A;
-    --line:#333B31; --accent:#FF7A52; --accent-ink:#141613; --good:#4CC492; --warn:#E9B24A;
+    --bg:#1C1521; --surface:#261D2C; --surface-2:#302536; --ink:#F3EDF5; --muted:#AE9FB6;
+    --line:#3D2F44; --accent:#F5769A; --accent-ink:#1C1521; --good:#57C3AF; --warn:#E7B569;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#141613; --surface:#1D211C; --surface-2:#262B24; --ink:#EEF0EB; --muted:#9AA39A;
-  --line:#333B31; --accent:#FF7A52; --accent-ink:#141613; --good:#4CC492; --warn:#E9B24A;
+  --bg:#1C1521; --surface:#261D2C; --surface-2:#302536; --ink:#F3EDF5; --muted:#AE9FB6;
+  --line:#3D2F44; --accent:#F5769A; --accent-ink:#1C1521; --good:#57C3AF; --warn:#E7B569;
   color-scheme:dark;
 }
 *{box-sizing:border-box;}
@@ -102,7 +102,7 @@ svg.chart{width:100%;height:auto;display:block;}
 .heat-cell.today{outline:2px solid var(--accent);outline-offset:1px;}
 .heat-cell.pad{background:none;border:none;}
 
-.goal-banner{background:var(--ink);color:var(--bg);border-radius:var(--radius);padding:18px;margin-block:12px;}
+.goal-banner{background:linear-gradient(135deg,var(--ink),color-mix(in srgb,var(--ink) 80%,var(--accent)));color:var(--bg);border-radius:var(--radius);padding:18px;margin-block:12px;}
 .goal-banner .row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;}
 .goal-banner .big{font-family:'Roboto Mono',monospace;font-weight:700;font-size:2rem;font-variant-numeric:tabular-nums;}
 .progress-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.15);margin-top:14px;overflow:hidden;}
@@ -128,7 +128,6 @@ svg.chart{width:100%;height:auto;display:block;}
 "use strict";
 
 var STORAGE_KEY='qingsu-diary-state-v1';
-var DB_NAME='qingsuDiaryDB', DB_VERSION=1, STORE_NAME='videoBlobs';
 
 var TRAINING_TYPES=['力量','核心塑形','HIIT','拉伸放松','有氧','瑜伽'];
 var VIDEO_CATEGORIES=['全身塑形','核心','上肢','下肢','拉伸放松','有氧'];
@@ -141,7 +140,10 @@ var confirming=null;
 var showGoalForm=false;
 var showLinkForm=false;
 var videoFilter='all';
-var videoUrlCache={};
+var secretTapCount=0;
+var secretTapTimer=null;
+var importPreview=null;
+var importPendingData=null;
 
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -155,62 +157,6 @@ function todayStr(){ return fmtDate(new Date()); }
 function parseDate(s){ var p=s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
 function shortDate(s){ var d=parseDate(s); return (d.getMonth()+1)+'/'+d.getDate(); }
 function round1(x){ return Math.round(x*10)/10; }
-
-/* ---------- IndexedDB for video blobs (local to this browser) ---------- */
-function openDB(){
-  return new Promise(function(resolve,reject){
-    if(!window.indexedDB){ reject(new Error('no-idb')); return; }
-    var req=indexedDB.open(DB_NAME,DB_VERSION);
-    req.onupgradeneeded=function(e){
-      var db=e.target.result;
-      if(!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
-    };
-    req.onsuccess=function(e){ resolve(e.target.result); };
-    req.onerror=function(e){ reject(e.target.error); };
-  });
-}
-function idbPut(id,blob){
-  return openDB().then(function(db){
-    return new Promise(function(resolve,reject){
-      var tx=db.transaction(STORE_NAME,'readwrite');
-      tx.objectStore(STORE_NAME).put(blob,id);
-      tx.oncomplete=function(){ resolve(); };
-      tx.onerror=function(){ reject(tx.error); };
-    });
-  });
-}
-function idbGet(id){
-  return openDB().then(function(db){
-    return new Promise(function(resolve,reject){
-      var tx=db.transaction(STORE_NAME,'readonly');
-      var req=tx.objectStore(STORE_NAME).get(id);
-      req.onsuccess=function(){ resolve(req.result); };
-      req.onerror=function(){ reject(req.error); };
-    });
-  });
-}
-function idbDelete(id){
-  return openDB().then(function(db){
-    return new Promise(function(resolve,reject){
-      var tx=db.transaction(STORE_NAME,'readwrite');
-      tx.objectStore(STORE_NAME).delete(id);
-      tx.oncomplete=function(){ resolve(); };
-      tx.onerror=function(){ reject(tx.error); };
-    });
-  });
-}
-function hydrateVideos(){
-  document.querySelectorAll('video[data-blob-id]').forEach(function(v){
-    var id=v.getAttribute('data-blob-id');
-    if(videoUrlCache[id]){ v.src=videoUrlCache[id]; return; }
-    idbGet(id).then(function(blob){
-      if(!blob) return;
-      var url=URL.createObjectURL(blob);
-      videoUrlCache[id]=url;
-      v.src=url;
-    }).catch(function(){});
-  });
-}
 
 /* ---------- state helpers ---------- */
 function latestWeight(state){
@@ -329,7 +275,7 @@ function goalSetupCard(goal){
 
 function renderHeader(state){
   var lw=latestWeight(state);
-  return '<header class="appbar"><div class="brand">轻塑日记<small>塑形 · 减重 · 打卡</small></div>'
+  return '<header class="appbar"><div class="brand" data-secret-trigger>轻塑日记<small>塑形 · 减重 · 打卡</small></div>'
     +'<div class="weight-pill"><span class="num mono">'+(lw?lw.weight:'--')+'</span><span class="unit">kg</span></div></header>';
 }
 function renderTabs(){
@@ -429,11 +375,8 @@ function renderVideosTab(state){
     return '<button type="button" class="chip filter" data-chip data-value="'+val+'" aria-pressed="'+(videoFilter===val?'true':'false')+'">'+c+'</button>';
   }).join('')+'</div>';
   var toolbar='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
-    +'<label class="btn primary" for="video-file-input" style="cursor:pointer;">上传视频</label>'
-    +'<input type="file" id="video-file-input" accept="video/*" data-video-upload hidden>'
-    +'<select id="upload-category-select" class="select-inline">'+VIDEO_CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('')+'</select>'
-    +'<button type="button" class="btn ghost" data-action="toggle-link-form">'+(showLinkForm?'取消添加链接':'+ 添加链接')+'</button>'
-    +'</div><p class="cap" style="margin-top:8px;">上传的视频保存在你当前使用的这台设备/浏览器里（换设备或清除浏览器数据后需要重新上传），建议单个文件不超过 300MB。较长的教程建议用"添加链接"关联网盘或视频网站地址。</p>';
+    +'<button type="button" class="btn primary" data-action="toggle-link-form">'+(showLinkForm?'取消添加':'+ 添加视频链接')+'</button>'
+    +'</div><p class="cap" style="margin-top:8px;">视频以链接方式添加，适合关联网盘、B站、YouTube 等已上传好的教程。</p>';
   var linkForm=showLinkForm?('<form data-form="video-link" data-chip-group="select-video-category" style="margin-top:12px;">'
     +'<input type="hidden" name="category" value="'+VIDEO_CATEGORIES[0]+'">'
     +'<div class="field"><label>视频标题</label><input type="text" name="title" required placeholder="如：20分钟核心塑形"></div>'
@@ -447,13 +390,40 @@ function renderVideosTab(state){
   } else {
     grid='<div class="video-grid">'+list.slice().reverse().map(function(v){
       var key='video:'+v.id;
-      var media=v.external
+      var media=v.url
         ? '<a class="thumb-link" href="'+esc(v.url)+'" target="_blank" rel="noopener">打开视频 →</a>'
-        : '<video data-blob-id="'+v.id+'" controls preload="metadata"></video>';
+        : '<div class="thumb-link">链接不可用</div>';
       return '<div class="video-card">'+media+'<div class="info"><div class="title">'+esc(v.title)+'</div><div class="cat">'+esc(v.category)+'</div>'+delControl(key)+'</div></div>';
     }).join('')+'</div>';
   }
   return '<div class="card"><h2>跟练视频库</h2><p class="sub">上传训练视频或添加外部链接，随时跟练</p>'+filterChips+toolbar+linkForm+'</div><div style="margin-top:4px;">'+grid+'</div>';
+}
+
+function buildExportPayload(state){
+  return {
+    app:'qingsu-diary', version:1, exportedAt:new Date().toISOString(),
+    goal:state.goal, weights:state.weights, checkins:state.checkins,
+    videos:state.videos
+  };
+}
+
+function renderSyncTab(state){
+  var payload=buildExportPayload(state);
+  var sizeKb=Math.round(new Blob([JSON.stringify(payload)]).size/1024*10)/10;
+  var html='<div class="card"><div class="section-head"><h2>数据同步（隐藏模式）</h2><button type="button" class="link-btn" data-tab="today">返回</button></div>'
+    +'<p class="sub">在这台设备导出数据文件，到另一台设备轻点两下顶部的"轻塑日记"标题打开同一个隐藏模式再导入，即可同步体重、打卡记录和视频链接。</p>'
+    +'<button type="button" class="btn primary" data-action="export-data">导出数据文件</button>'
+    +'<p class="cap" style="margin-top:8px;">当前可导出数据约 '+sizeKb+' KB</p></div>';
+  html+='<div class="card"><h2>导入数据</h2><p class="sub">选择之前导出的 .json 文件。导入会覆盖当前设备上的体重和训练记录，请确认后再操作。</p>'
+    +'<input type="file" id="import-file-input" accept="application/json,.json" data-import-file>';
+  if(importPreview){
+    html+='<div class="card" style="margin-top:12px;background:var(--surface-2);border-style:dashed;">'
+      +'<div class="sub" style="margin-bottom:8px;">文件预览：'+importPreview.weights+' 条体重记录 · '+importPreview.checkins+' 条训练记录 · '+importPreview.videos+' 个视频链接'+(importPreview.goal?(' · 目标 '+esc(importPreview.goal.targetWeight)+' kg'):'')+'</div>'
+      +'<div style="display:flex;gap:10px;"><button type="button" class="btn primary" style="background:var(--warn);border-color:var(--warn);" data-action="confirm-import">确认导入并覆盖</button><button type="button" class="btn ghost" data-action="cancel-import">取消</button></div>'
+      +'</div>';
+  }
+  html+='</div>';
+  return html;
 }
 
 function renderApp(state){
@@ -461,6 +431,7 @@ function renderApp(state){
   if(currentTab==='today') body=renderToday(state);
   else if(currentTab==='weight') body=renderWeightTab(state);
   else if(currentTab==='training') body=renderTrainingTab(state);
+  else if(currentTab==='sync') body=renderSyncTab(state);
   else body=renderVideosTab(state);
   return renderHeader(state)+renderTabs()+'<main>'+body+'</main>';
 }
@@ -468,7 +439,6 @@ function renderApp(state){
 function render(){
   var el=document.getElementById('app');
   if(el) el.innerHTML=renderApp(STATE);
-  hydrateVideos();
 }
 
 function showToast(msg){
@@ -495,13 +465,8 @@ function mutate(fn){
 function deleteWeight(id){ mutate(function(s){ s.weights=s.weights.filter(function(w){return w.id!==id;}); }); showToast('已删除'); }
 function deleteCheckin(id){ mutate(function(s){ s.checkins=s.checkins.filter(function(c){return c.id!==id;}); }); showToast('已删除'); }
 function deleteVideo(id){
-  var v=STATE.videos.find(function(x){return x.id===id;});
   mutate(function(s){ s.videos=s.videos.filter(function(x){return x.id!==id;}); });
   showToast('已删除');
-  if(v&&!v.external){
-    idbDelete(id).catch(function(){});
-    if(videoUrlCache[id]){ URL.revokeObjectURL(videoUrlCache[id]); delete videoUrlCache[id]; }
-  }
 }
 
 function handleGoalSetup(form){
@@ -550,21 +515,56 @@ function handleVideoLink(form){
   showLinkForm=false;
   showToast('视频已添加');
 }
-function handleVideoUpload(input){
+function handleExport(){
+  var payload=buildExportPayload(STATE);
+  var json=JSON.stringify(payload,null,2);
+  var blob=new Blob([json],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='qingsu-diary-'+todayStr()+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+  showToast('已导出，把这个文件传到另一台设备再导入');
+}
+
+function handleImportFile(input){
   var file=input.files&&input.files[0];
   if(!file) return;
-  var id=uid();
-  var catSelect=document.getElementById('upload-category-select');
-  var category=catSelect?catSelect.value:VIDEO_CATEGORIES[0];
-  showToast('正在保存视频...');
-  idbPut(id,file).then(function(){
-    var title=file.name.replace(/\.[^.]+$/,'');
-    mutate(function(s){ s.videos.push({id:id,title:title,category:category,external:false,addedDate:todayStr()}); });
-    showToast('视频已保存到本机');
-  }).catch(function(){
-    showToast('保存失败（可能是存储空间不足或浏览器不支持）');
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var data=JSON.parse(String(reader.result));
+      if(!data||typeof data!=='object') throw new Error('bad');
+      var weights=Array.isArray(data.weights)?data.weights:[];
+      var checkins=Array.isArray(data.checkins)?data.checkins:[];
+      var videos=(Array.isArray(data.videos)?data.videos:[]).filter(function(v){return v&&v.id;});
+      var goal=(data.goal&&typeof data.goal==='object')?data.goal:null;
+      importPendingData={goal:goal,weights:weights,checkins:checkins,videos:videos};
+      importPreview={weights:weights.length,checkins:checkins.length,videos:videos.length,goal:goal};
+      render();
+    }catch(e){
+      showToast('文件格式不正确，无法导入');
+    }
+    input.value='';
+  };
+  reader.onerror=function(){ showToast('读取文件失败'); input.value=''; };
+  reader.readAsText(file);
+}
+
+function applyImport(){
+  if(!importPendingData) return;
+  mutate(function(s){
+    s.goal=importPendingData.goal;
+    s.weights=importPendingData.weights;
+    s.checkins=importPendingData.checkins;
+    s.videos=importPendingData.videos;
   });
-  input.value='';
+  importPendingData=null;
+  importPreview=null;
+  showToast('导入完成');
 }
 
 function onChipClick(chip){
@@ -592,8 +592,32 @@ function boot(){
 
   var app=document.getElementById('app');
   app.addEventListener('click',function(e){
+    var secretEl=e.target.closest('[data-secret-trigger]');
+    if(secretEl){
+      secretTapCount++;
+      clearTimeout(secretTapTimer);
+      secretTapTimer=setTimeout(function(){ secretTapCount=0; },500);
+      if(secretTapCount>=2){
+        secretTapCount=0;
+        currentTab='sync';
+        importPreview=null; importPendingData=null;
+        render();
+        window.scrollTo(0,0);
+      }
+      return;
+    }
+
     var tabEl=e.target.closest('[data-tab]');
     if(tabEl){ currentTab=tabEl.dataset.tab; confirming=null; render(); window.scrollTo(0,0); return; }
+
+    var exportBtn=e.target.closest('[data-action="export-data"]');
+    if(exportBtn){ handleExport(); return; }
+
+    var confirmImportBtn=e.target.closest('[data-action="confirm-import"]');
+    if(confirmImportBtn){ applyImport(); return; }
+
+    var cancelImportBtn=e.target.closest('[data-action="cancel-import"]');
+    if(cancelImportBtn){ importPendingData=null; importPreview=null; render(); return; }
 
     var chip=e.target.closest('[data-chip]');
     if(chip){ onChipClick(chip); return; }
@@ -642,7 +666,7 @@ function boot(){
   });
 
   app.addEventListener('change',function(e){
-    if(e.target.matches('[data-video-upload]')) handleVideoUpload(e.target);
+    if(e.target.matches('[data-import-file]')) handleImportFile(e.target);
   });
 }
 

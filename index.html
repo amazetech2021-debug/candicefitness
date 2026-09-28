@@ -144,6 +144,7 @@ var secretTapCount=0;
 var secretTapTimer=null;
 var importPreview=null;
 var importPendingData=null;
+var calendarMonthOffset=0;
 
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -232,17 +233,18 @@ function chartSVG(state){
     +targetLine+circles+lastLabel+firstDateLabel+lastDateLabel
     +'</svg></div>';
 }
-function heatmapGrid(state,weeks){
-  weeks=weeks||6;
+function heatmapGrid(state,monthOffset,interactive){
+  monthOffset=monthOffset||0;
+  var base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+monthOffset);
+  var year=base.getFullYear(), month=base.getMonth();
   var set={}; state.checkins.forEach(function(c){set[c.date]=true;});
   var today=new Date(); today.setHours(0,0,0,0);
-  var totalDays=weeks*7;
-  var days=[];
-  for(var i=totalDays-1;i>=0;i--){ var d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
-  var firstDow=(days[0].getDay()+6)%7;
+  var first=new Date(year,month,1);
+  var daysInMonth=new Date(year,month+1,0).getDate();
+  var firstDow=(first.getDay()+6)%7;
   var cells=[];
   for(var p=0;p<firstDow;p++) cells.push(null);
-  days.forEach(function(d){ cells.push(d); });
+  for(var day=1;day<=daysInMonth;day++) cells.push(new Date(year,month,day));
   var dowLabels=['一','二','三','四','五','六','日'];
   var head=dowLabels.map(function(l){return '<div class="dow">'+l+'</div>';}).join('');
   var body=cells.map(function(d){
@@ -252,7 +254,15 @@ function heatmapGrid(state,weeks){
     var done=!!set[ds];
     return '<div class="heat-cell'+(done?' done':'')+(isToday?' today':'')+'" title="'+ds+(done?' 已打卡':'')+'">'+d.getDate()+'</div>';
   }).join('');
-  return '<div class="heatmap">'+head+body+'</div>';
+  var monthLabel=year+'年'+(month+1)+'月';
+  var head2=interactive
+    ? '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      +'<button type="button" class="btn ghost" data-action="cal-prev">‹ 上月</button>'
+      +'<span style="font-weight:700;">'+monthLabel+'</span>'
+      +'<button type="button" class="btn ghost" data-action="cal-next"'+(monthOffset>=0?' disabled style="opacity:.4;"':'')+'>下月 ›</button>'
+      +'</div>'
+    : '<div class="cap" style="margin-bottom:8px;font-weight:700;color:var(--ink);opacity:1;">'+monthLabel+'</div>';
+  return head2+'<div class="heatmap">'+head+body+'</div>';
 }
 
 function goalSetupCard(goal){
@@ -317,7 +327,7 @@ function renderToday(state){
     +'<div class="chip-row">'+TRAINING_TYPES.map(function(t){
       return '<button type="button" class="chip" data-quick-checkin="'+t+'" aria-pressed="'+(todayTypesDone[t]?'true':'false')+'">'+t+'</button>';
     }).join('')+'</div></div>';
-  html+='<div class="card"><div class="section-head"><h2>近两周训练</h2><button type="button" class="link-btn" data-tab="training">查看全部</button></div>'+heatmapGrid(state,2)+'</div>';
+  html+='<div class="card"><div class="section-head"><h2>本月训练</h2><button type="button" class="link-btn" data-tab="training">查看全部</button></div>'+heatmapGrid(state,0,false)+'</div>';
   html+='<div class="card"><div class="section-head"><h2>体重趋势</h2><button type="button" class="link-btn" data-tab="weight">查看全部</button></div>'+chartSVG(state)+'</div>';
   return html;
 }
@@ -347,7 +357,7 @@ function renderTrainingTab(state){
   var streak=computeStreak(state.checkins), weekCount=computeWeekCount(state.checkins);
   var entries=state.checkins.slice().sort(function(a,b){return a.date<b.date?-1:1;});
   var html='<div class="stat-grid">'+statTile('连续打卡',streak,'天')+statTile('本周训练',weekCount,'次')+'</div>';
-  html+='<div class="card"><h2>训练日历</h2>'+heatmapGrid(state,6)+'</div>';
+  html+='<div class="card"><h2>训练日历</h2>'+heatmapGrid(state,calendarMonthOffset,true)+'</div>';
   html+='<div class="card"><h2>记录训练</h2><form data-form="checkin-add" data-chip-group="select-checkin-type">'
     +'<input type="hidden" name="type" value="">'
     +'<div class="field"><label>训练类型</label><div class="chip-row">'+TRAINING_TYPES.map(function(t){return '<button type="button" class="chip" data-chip data-value="'+t+'" aria-pressed="false">'+t+'</button>';}).join('')+'</div></div>'
@@ -617,6 +627,12 @@ function boot(){
 
     var cancelImportBtn=e.target.closest('[data-action="cancel-import"]');
     if(cancelImportBtn){ importPendingData=null; importPreview=null; render(); return; }
+
+    var calPrev=e.target.closest('[data-action="cal-prev"]');
+    if(calPrev){ calendarMonthOffset--; render(); return; }
+
+    var calNext=e.target.closest('[data-action="cal-next"]');
+    if(calNext){ if(calendarMonthOffset<0){ calendarMonthOffset++; render(); } return; }
 
     var chip=e.target.closest('[data-chip]');
     if(chip){ onChipClick(chip); return; }

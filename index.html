@@ -97,8 +97,8 @@ svg.chart{width:100%;height:auto;display:block;}
 
 .heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
 .heatmap .dow{font-size:.68rem;text-align:center;color:var(--muted);font-weight:700;}
-.heat-cell{aspect-ratio:1;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);}
-.heat-cell.done{background:var(--good);border-color:var(--good);}
+.heat-cell{aspect-ratio:1;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:600;color:var(--muted);font-family:'Roboto Mono',monospace;}
+.heat-cell.done{background:var(--good);border-color:var(--good);color:#fff;}
 .heat-cell.today{outline:2px solid var(--accent);outline-offset:1px;}
 .heat-cell.pad{background:none;border:none;}
 
@@ -179,10 +179,8 @@ function computeWeekCount(checkins){
   checkins.forEach(function(c){ var cd=parseDate(c.date); if(cd>=monday && cd<=d) count++; });
   return count;
 }
-function upsertCheckin(s,date,type,duration,note){
-  var idx=s.checkins.findIndex(function(c){return c.date===date;});
-  var entry={id: idx>=0?s.checkins[idx].id:uid(), date:date, type:type, duration:duration, note:note};
-  if(idx>=0) s.checkins[idx]=entry; else s.checkins.push(entry);
+function addCheckin(s,date,type,duration,note){
+  s.checkins.push({id:uid(), date:date, type:type, duration:duration, note:note});
 }
 
 function statTile(label,value,unit){
@@ -252,7 +250,7 @@ function heatmapGrid(state,weeks){
     var ds=fmtDate(d);
     var isToday=ds===fmtDate(today);
     var done=!!set[ds];
-    return '<div class="heat-cell'+(done?' done':'')+(isToday?' today':'')+'" title="'+ds+(done?' 已打卡':'')+'"></div>';
+    return '<div class="heat-cell'+(done?' done':'')+(isToday?' today':'')+'" title="'+ds+(done?' 已打卡':'')+'">'+d.getDate()+'</div>';
   }).join('');
   return '<div class="heatmap">'+head+body+'</div>';
 }
@@ -311,12 +309,13 @@ function renderToday(state){
     +statTile('较起始',(deltaStart>=0?'+':'')+deltaStart,'kg')
     +statTile('塑形重点',state.goal.focus,'')
     +'</div>';
-  var todayEntry=state.checkins.find(function(c){return c.date===todayStr();});
+  var todayEntries=state.checkins.filter(function(c){return c.date===todayStr();});
+  var todayTypesDone={}; todayEntries.forEach(function(c){ todayTypesDone[c.type]=true; });
   html+='<div class="card"><div class="section-head"><h2>今日打卡</h2>'
-    +(todayEntry?'<span class="cap" style="color:var(--good);font-weight:700;opacity:1;">已打卡：'+esc(todayEntry.type)+'</span>':'')
-    +'</div><p class="sub">点一下记录今天的训练类型，详情可在"训练"页补充时长与备注</p>'
+    +(todayEntries.length?'<span class="cap" style="color:var(--good);font-weight:700;opacity:1;">已打卡 '+todayEntries.length+' 次：'+esc(todayEntries.map(function(c){return c.type;}).join('、'))+'</span>':'')
+    +'</div><p class="sub">点一下记录今天的训练类型，一天可以打多次卡；详情可在"训练"页补充时长与备注</p>'
     +'<div class="chip-row">'+TRAINING_TYPES.map(function(t){
-      return '<button type="button" class="chip" data-quick-checkin="'+t+'" aria-pressed="'+(todayEntry&&todayEntry.type===t?'true':'false')+'">'+t+'</button>';
+      return '<button type="button" class="chip" data-quick-checkin="'+t+'" aria-pressed="'+(todayTypesDone[t]?'true':'false')+'">'+t+'</button>';
     }).join('')+'</div></div>';
   html+='<div class="card"><div class="section-head"><h2>近两周训练</h2><button type="button" class="link-btn" data-tab="training">查看全部</button></div>'+heatmapGrid(state,2)+'</div>';
   html+='<div class="card"><div class="section-head"><h2>体重趋势</h2><button type="button" class="link-btn" data-tab="weight">查看全部</button></div>'+chartSVG(state)+'</div>';
@@ -502,7 +501,7 @@ function handleCheckinAdd(form){
   var date=form.date.value||todayStr();
   var duration=form.duration.value?parseInt(form.duration.value,10):null;
   var note=form.note.value.trim();
-  mutate(function(s){ upsertCheckin(s,date,type,duration,note); });
+  mutate(function(s){ addCheckin(s,date,type,duration,note); });
   showToast('训练记录已保存');
 }
 function handleVideoLink(form){
@@ -625,7 +624,7 @@ function boot(){
     var quick=e.target.closest('[data-quick-checkin]');
     if(quick){
       var type=quick.dataset.quickCheckin;
-      mutate(function(s){ upsertCheckin(s,todayStr(),type,null,''); });
+      mutate(function(s){ addCheckin(s,todayStr(),type,null,''); });
       showToast('已打卡：'+type);
       return;
     }
